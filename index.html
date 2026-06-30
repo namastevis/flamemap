@@ -3,202 +3,220 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>FLAME University Wayfinder</title>
+    <title>FLAME ALIGN0 - Digital Wayfinder</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        /* Reset and strict viewport lock */
+        /* Strict Mobile Viewport Lock */
         * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-        html, body { width: 100%; height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f8f9fa; }
+        html, body { width: 100%; height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #111; }
 
-        /* Master App Wrapper */
         .app-container { display: flex; flex-direction: column; width: 100%; height: 100%; position: relative; }
 
-        /* 1. Dynamic Instruction Header (Floating) */
-        .floating-header { position: absolute; top: 12px; left: 12px; right: 12px; z-index: 1000; background: rgba(255, 255, 255, 0.92); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); border-radius: 16px; padding: 14px 16px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08); border: 1px solid rgba(255, 255, 255, 0.5); display: flex; align-items: center; gap: 10px; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-        .status-dot { width: 8px; height: 8px; background-color: #007ff7; border-radius: 50%; display: inline-block; animation: pulse 2s infinite; }
-        #instruction-text { font-size: 14px; color: #1e293b; font-weight: 600; line-height: 1.4; }
+        /* Fullscreen Map Canvas */
+        #map { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; background: #1a1a1a; }
+        .leaflet-control-zoom, .leaflet-control-attribution { display: none !important; }
 
-        /* 2. Fullscreen Map Layer */
-        #map { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; }
+        /* Floating Minimal Header */
+        .top-brand { position: absolute; top: 20px; left: 20px; z-index: 1000; color: white; font-weight: 800; font-size: 18px; letter-spacing: 1px; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+        .top-brand span { color: #3b82f6; }
 
-        /* 3. Bottom Action Control Center */
-        .control-drawer { position: absolute; bottom: 0; left: 0; right: 0; z-index: 1000; background: rgba(255, 255, 255, 0.9); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); border-top-left-radius: 24px; border-top-right-radius: 24px; padding: 16px 20px 24px 20px; box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.08); border-top: 1px solid rgba(255, 255, 255, 0.4); display: flex; flex-direction: column; gap: 14px; }
+        /* * ALIGN0 Dot Styling (The Core Concept)
+         * Default: Dim, neutral gray, just a number.
+         */
+        .align-dot { 
+            width: 24px; height: 24px; background: rgba(255, 255, 255, 0.15); 
+            border: 1px solid rgba(255,255,255,0.4); border-radius: 50%; 
+            display: flex; justify-content: center; align-items: center; 
+            color: #ccc; font-size: 11px; font-weight: 700; transition: all 0.4s ease;
+            backdrop-filter: blur(4px);
+        }
         
-        /* Category Chips Bar */
-        .chips-container { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
-        .chips-container::-webkit-scrollbar { display: none; }
+        /* State 1: Fade out unselected nodes */
+        .dimmed .align-dot { opacity: 0.15; transform: scale(0.8); }
         
-        .chip { background: #ffffff; color: #475569; border: 1px solid #e2e8f0; padding: 10px 18px; border-radius: 25px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); transition: all 0.2s ease; }
-        .chip.active { background: #1e293b; color: #ffffff; border-color: #1e293b; }
+        /* State 2: Source Node (Blue Pulse) */
+        .align-dot.source-active { 
+            background: #3b82f6; border-color: #60a5fa; color: white; opacity: 1 !important; 
+            transform: scale(1.3); box-shadow: 0 0 15px rgba(59, 130, 246, 0.6); 
+        }
+        
+        /* State 3: Destination Node (Green Pulse) */
+        .align-dot.dest-active { 
+            background: #10b981; border-color: #34d399; color: white; opacity: 1 !important; 
+            transform: scale(1.3); box-shadow: 0 0 15px rgba(16, 185, 129, 0.6); 
+        }
 
-        /* Cancel/Reset UI Button */
-        #reset-btn { display: none; background: #fee2e2; color: #ef4444; border: 1px solid #fca5a5; padding: 10px 18px; border-radius: 25px; font-size: 13px; font-weight: 700; cursor: pointer; animation: fadeIn 0.2s ease; }
+        /* Bottom Alignment Control Drawer */
+        .alignment-drawer { 
+            position: absolute; bottom: 0; left: 0; right: 0; z-index: 1000; 
+            background: rgba(20, 20, 20, 0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            border-top: 1px solid rgba(255,255,255,0.1); border-top-left-radius: 24px; border-top-right-radius: 24px; 
+            padding: 24px 20px 32px 20px; box-shadow: 0 -10px 40px rgba(0,0,0,0.5); 
+            display: flex; flex-direction: column; gap: 16px; 
+        }
 
-        /* Navigation Route Output Panel */
-        .route-summary { display: none; background: #f1f5f9; padding: 12px 16px; border-radius: 12px; border: 1px solid #e2e8f0; align-items: center; justify-content: space-between; }
-        .route-info { font-size: 13px; color: #334155; font-weight: 500; }
+        .input-group { display: flex; flex-direction: column; gap: 6px; }
+        .input-group label { color: #888; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+        
+        select { 
+            width: 100%; appearance: none; background: rgba(255,255,255,0.05); 
+            border: 1px solid rgba(255,255,255,0.2); color: white; padding: 14px 16px; 
+            border-radius: 12px; font-size: 15px; font-weight: 600; outline: none; 
+            transition: border-color 0.2s;
+        }
+        select:focus { border-color: #3b82f6; }
+        select:disabled { opacity: 0.5; }
 
-        /* Animations */
-        @keyframes pulse { 0% { transform: scale(0.9); opacity: 1; } 50% { transform: scale(1.2); opacity: 0.5; } 100% { transform: scale(0.9); opacity: 1; } }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        .select-source { border-left: 4px solid #3b82f6; }
+        .select-dest { border-left: 4px solid #10b981; }
 
-        /* Custom Leaflet Map Adjustments */
-        .leaflet-bottom.leaflet-right, .leaflet-top.leaflet-left { display: none !important; } /* Hide default cluttered buttons */
+        #reset-btn { 
+            display: none; background: transparent; color: #ef4444; 
+            border: 1px solid #ef4444; padding: 12px; border-radius: 12px; 
+            font-size: 14px; font-weight: 700; text-align: center; cursor: pointer; 
+            margin-top: 8px;
+        }
     </style>
 </head>
 <body>
 
     <div class="app-container">
-        <div class="floating-header" id="header-bar">
-            <span class="status-dot" id="status-dot"></span>
-            <div id="instruction-text">Tap your starting building on the campus map</div>
-        </div>
+        <div class="top-brand">FLAME<span>ALIGN</span></div>
 
         <div id="map"></div>
 
-        <div class="control-drawer">
-            <div class="chips-container" id="chips-bar">
-                <button id="reset-btn" onclick="resetNavigation()">❌ Clear Route</button>
-                <button class="chip" onclick="toggleFilter('academics', this)">📚 Academics</button>
-                <button class="chip" onclick="toggleFilter('eateries', this)">☕ Eateries</button>
-                <button class="chip" onclick="toggleFilter('sports', this)">⚽ Sports</button>
-                <button class="chip" onclick="toggleFilter('housing', this)">🏠 Housing</button>
+        <div class="alignment-drawer">
+            <div class="input-group">
+                <label>Source Node</label>
+                <select id="source-select" class="select-source" onchange="processAlignment()">
+                    <option value="" disabled selected>Where are you?</option>
+                    <option value="3">3. Vivekananda Library</option>
+                    <option value="6">6. Chanakya Lecture Theatre</option>
+                    <option value="18">18. Arjuna Sports Centre</option>
+                    <option value="30">30. Blue Tokai Cafe</option>
+                </select>
             </div>
-            
-            <div class="route-summary" id="route-panel">
-                <div class="route-info" id="route-details">Calculating route...</div>
+
+            <div class="input-group">
+                <label>Destination Node</label>
+                <select id="dest-select" class="select-dest" onchange="processAlignment()">
+                    <option value="" disabled selected>Where are you going?</option>
+                    <option value="3">3. Vivekananda Library</option>
+                    <option value="6">6. Chanakya Lecture Theatre</option>
+                    <option value="18">18. Arjuna Sports Centre</option>
+                    <option value="30">30. Blue Tokai Cafe</option>
+                </select>
             </div>
+
+            <div id="reset-btn" onclick="resetGrid()">Clear Alignment</div>
         </div>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        // Set coordinates directly to FLAME University's core spine structure
+        // Init map with a sleek Dark Mode base layer to act as our neutral canvas
         const map = L.map('map', { zoomControl: false }).setView([18.5202, 73.7385], 18);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 }).addTo(map);
 
-        // Fetching clean design Map Tiles via CartoDB (strips clutter, highlights custom data)
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-            maxZoom: 20
-        }).addTo(map);
+        // Core logic variables
+        let markers = {};
+        let activeRoute = null;
 
-        let currentStep = 1; 
-        let startNode = null;
-        let endNode = null;
-        let routeLine = null;
-        let activeMarkers = L.layerGroup().addTo(map);
-        let activeCategory = null;
-
-        // Accurate geographic coordinate array maps for key points
-        const campusFeatures = [
-            { id: "3", name: "Vivekananda Library", category: "academics", lat: 18.52025, lng: 73.73902 },
-            { id: "6", name: "Chanakya Lecture Theatre", category: "academics", lat: 18.51980, lng: 73.73830 },
-            { id: "30", name: "Blue Tokai Cafe", category: "eateries", lat: 18.51950, lng: 73.73895 },
-            { id: "18", name: "Arjuna Centre for Sports", category: "sports", lat: 18.52180, lng: 73.73850 }
+        // The Dataset (IDs match the physical numbers)
+        const campusNodes = [
+            { id: "3", lat: 18.52025, lng: 73.73902 },
+            { id: "6", lat: 18.51980, lng: 73.73830 },
+            { id: "18", lat: 18.52180, lng: 73.73850 },
+            { id: "30", lat: 18.51950, lng: 73.73895 }
         ];
 
-        // Custom paths network array mapping routes across the real terrain layout
-        const networkPaths = {
+        // Path Data
+        const routeData = {
             "3-to-30": [[18.52025, 73.73902], [18.51990, 73.73910], [18.51950, 73.73895]],
             "6-to-3": [[18.51980, 73.73830], [18.51995, 73.73860], [18.52025, 73.73902]],
             "18-to-3": [[18.52180, 73.73850], [18.52090, 73.73870], [18.52025, 73.73902]]
         };
 
-        function toggleFilter(category, element) {
-            // Uncheck previous chip selections
-            document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
-            
-            if (activeCategory === category) {
-                activeCategory = null;
-                activeMarkers.clearLayers();
-                return;
-            }
-
-            activeCategory = category;
-            element.classList.add('active');
-            displayFilteredPins(category);
-        }
-
-        function displayFilteredPins(category) {
-            activeMarkers.clearLayers();
-            campusFeatures.filter(item => item.category === category).forEach(item => {
-                // Customized modern Minimalist UI Pin Dots instead of default large map tears
-                const customDot = L.divIcon({
-                    className: 'custom-pin',
-                    html: `<div style="background:#007ff7; width:14px; height:14px; border-radius:50%; border:3px solid #fff; box-shadow:0 2px 6px rgba(0,0,0,0.3);"></div>`,
-                    iconSize: [14, 14]
+        // Render the neutral grid of numbers
+        function renderGrid() {
+            campusNodes.forEach(node => {
+                const icon = L.divIcon({
+                    className: 'node-wrapper', // Wrapper to handle fading
+                    html: `<div class="align-dot" id="dot-${node.id}">${node.id}</div>`,
+                    iconSize: [24, 24],
+                    iconAnchor: [12, 12]
                 });
-
-                const marker = L.marker([item.lat, item.lng], { icon: customDot }).addTo(activeMarkers);
-                
-                const framePopup = `
-                    <div style="padding: 4px; font-family: sans-serif; text-align:center;">
-                        <div style="font-weight:700; margin-bottom:8px; color:#1e293b; font-size:13px;">${item.name}</div>
-                        <button onclick="executeStepFlow('${item.id}', '${item.name}')" style="background:#1e293b; color:#fff; border:none; padding:6px 12px; border-radius:8px; font-size:11px; font-weight:600; width:100%; cursor:pointer;">Choose Location</button>
-                    </div>`;
-
-                marker.bindPopup(framePopup, { closeButton: false, offset: [0, -5] });
+                markers[node.id] = L.marker([node.lat, node.lng], { icon: icon }).addTo(map);
             });
         }
 
-        function executeStepFlow(id, name) {
-            map.closePopup();
-            if (currentStep === 1) {
-                startNode = id;
-                document.getElementById('instruction-text').innerHTML = `🛫 From: <span style="color:#007ff7">${name}</span><br>🏁 Step 2: Choose your destination`;
-                document.getElementById('status-dot').style.backgroundColor = "#eab308";
-                currentStep = 2;
-            } else if (currentStep === 2) {
-                endNode = id;
-                renderCalculatedPath(startNode, endNode);
+        // The Alignment Engine
+        function processAlignment() {
+            const sourceId = document.getElementById('source-select').value;
+            const destId = document.getElementById('dest-select').value;
+
+            // Step 1: Reset all dots to neutral state
+            document.querySelectorAll('.align-dot').forEach(el => {
+                el.className = 'align-dot'; 
+            });
+            document.querySelector('.leaflet-marker-pane').classList.remove('dimmed');
+            if (activeRoute) map.removeLayer(activeRoute);
+
+            // Step 2: If at least one is selected, dim the rest of the map
+            if (sourceId || destId) {
+                document.querySelector('.leaflet-marker-pane').classList.add('dimmed');
+                document.getElementById('reset-btn').style.display = "block";
+            }
+
+            // Step 3: Illuminate Source
+            if (sourceId) {
+                const sourceDot = document.getElementById(`dot-${sourceId}`);
+                if (sourceDot) sourceDot.classList.add('source-active');
+                map.panTo(markers[sourceId].getLatLng()); // Auto-snap camera
+            }
+
+            // Step 4: Illuminate Destination
+            if (destId) {
+                const destDot = document.getElementById(`dot-${destId}`);
+                if (destDot) destDot.classList.add('dest-active');
+            }
+
+            // Step 5: If aligned perfectly (both selected), draw glowing path
+            if (sourceId && destId) {
+                if (sourceId === destId) return; // Ignore same-node routing
+                
+                const key = `${sourceId}-to-${destId}`;
+                const revKey = `${destId}-to-${sourceId}`;
+                const path = routeData[key] || routeData[revKey];
+
+                if (path) {
+                    activeRoute = L.polyline(path, { 
+                        color: '#ffffff', weight: 4, opacity: 0.9, dashArray: '8, 8',
+                        className: 'glowing-route' // Optional advanced CSS glowing animation
+                    }).addTo(map);
+                    
+                    // Zoom map perfectly to fit both dots and the line
+                    map.fitBounds(activeRoute.getBounds(), { padding: [80, 80] });
+                }
             }
         }
 
-        function renderCalculatedPath(start, end) {
-            const pathKey = `${start}-to-${end}`;
-            const invertedKey = `${end}-to-${start}`;
-            let geometricCoordinates = networkPaths[pathKey] || networkPaths[invertedKey];
-
-            if (geometricCoordinates) {
-                if (routeLine) map.removeLayer(routeLine);
-                
-                // Sleek tracking line presentation matching standard modern transport applications
-                routeLine = L.polyline(geometricCoordinates, { color: '#007ff7', weight: 5, opacity: 0.9, lineCap: 'round' }).addTo(map);
-                map.fitBounds(routeLine.getBounds(), { padding: [60, 60] });
-
-                document.getElementById('instruction-text').innerHTML = `🎉 Route found! Follow navigation line.`;
-                document.getElementById('status-dot').style.backgroundColor = "#22c55e";
-                document.getElementById('reset-btn').style.display = "block";
-                
-                // Show Route Status Panel
-                document.getElementById('route-panel').style.display = "flex";
-                document.getElementById('route-details').innerText = `Direct Campus Walkway Route Ready`;
-            } else {
-                document.getElementById('instruction-text').innerHTML = `❌ Direct path connection not mapped yet.`;
-                document.getElementById('reset-btn').style.display = "block";
-            }
-        }
-
-        function resetNavigation() {
-            if (routeLine) map.removeLayer(routeLine);
-            activeMarkers.clearLayers();
-            currentStep = 1;
-            startNode = null;
-            endNode = null;
-            activeCategory = null;
+        function resetGrid() {
+            document.getElementById('source-select').value = "";
+            document.getElementById('dest-select').value = "";
             
-            document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
-            document.getElementById('instruction-text').innerText = "Tap your starting building on the campus map";
-            document.getElementById('status-dot').style.backgroundColor = "#007ff7";
+            document.querySelectorAll('.align-dot').forEach(el => {
+                el.className = 'align-dot'; 
+            });
+            document.querySelector('.leaflet-marker-pane').classList.remove('dimmed');
+            if (activeRoute) map.removeLayer(activeRoute);
+            
             document.getElementById('reset-btn').style.display = "none";
-            document.getElementById('route-panel').style.display = "none";
-            
             map.setView([18.5202, 73.7385], 18);
         }
 
-        // Initialize state view defaults
-        displayFilteredPins('academics');
-        document.querySelector('.chip').classList.add('active');
-        activeCategory = 'academics';
+        // Initialize App
+        renderGrid();
     </script>
 </body>
 </html>
